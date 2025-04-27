@@ -1,0 +1,446 @@
+
+
+
+
+
+
+
+
+
+import traci
+import time
+import numpy as np
+import skfuzzy as fuzz
+from skfuzzy import control as ctrl
+import matplotlib.pyplot as plt
+
+
+sumo_cfg_file = "osm.sumocfg"
+junction_id = "cluster_249821091_249821092_249821094_26003449_#13more"   #Fortunaaa
+incoming_lanes = [
+    "1015631885#1_0", "188302703#1_0", "188302703#1_1", "188302703#1_2",
+    "-869087990_0", "-869087990_1", "1015631891#1_0"
+]
+
+def setup_fuzzy_system():
+    """Fuzzy szabályok beállítása Takagi-Sugeno modellhez."""
+    num_vehicles = ctrl.Antecedent(np.arange(0, 50, 1), 'num_vehicles')
+    waiting_time = ctrl.Antecedent(np.arange(0, 100, 1), 'waiting_time')
+    green_duration = ctrl.Consequent(np.arange(5, 60, 1), 'green_duration')
+
+    num_vehicles.automf(3)  # Alacsony, Közepes, Magas
+    waiting_time.automf(3)  # Rövid, Közepes, Hosszú
+
+    # Manually define fuzzy membership functions for the consequent (green_duration)
+    green_duration['poor'] = fuzz.trimf(green_duration.universe, [5, 5, 20])  # Short green light
+    green_duration['average'] = fuzz.trimf(green_duration.universe, [15, 30, 45])  # Medium green light
+    green_duration['good'] = fuzz.trimf(green_duration.universe, [35, 50, 50])  # Long green light
+
+    # Szabályok definiálása
+    rule1 = ctrl.Rule(num_vehicles['poor'] & waiting_time['poor'], green_duration['poor'])
+    rule2 = ctrl.Rule(num_vehicles['poor'] & waiting_time['average'], green_duration['average'])
+    rule3 = ctrl.Rule(num_vehicles['good'] & waiting_time['good'], green_duration['good'])
+
+    traffic_ctrl = ctrl.ControlSystem([rule1, rule2, rule3])
+    return ctrl.ControlSystemSimulation(traffic_ctrl)
+
+def run_simulation():
+    """SUMO szimuláció futtatása és fuzzy lámpavezérlés."""
+    print("SUMO szimuláció indítása...")
+
+    # Indítsuk el a szimulációt, biztosítva, hogy a fájl helyesen van beállítva
+    try:
+        traci.start(["sumo-gui", "-c", sumo_cfg_file])  # GUI nélkül: "sumo"
+    except Exception as e:
+        print(f"Hiba a szimuláció indításakor: {e}")
+        return  # Ha a szimuláció nem indul, ne folytassuk
+
+    fuzzy_system = setup_fuzzy_system()
+
+    last_green_time = None  # Eltároljuk az utolsó zöld időt
+    change_threshold = 3.0  # 3 másodperc küszöb, amikor a változást kiírjuk
+
+    # Itt hozzunk létre egy adatstruktúrát, hogy a lámpák állapotát nyomon követhessük
+    lane_green_times = {lane: None for lane in incoming_lanes}  # Minden sávhoz eltároljuk a zöld időt
+
+    while traci.simulation.getMinExpectedNumber() > 0:
+        traci.simulationStep()
+
+        total_vehicles = sum(traci.lane.getLastStepVehicleNumber(lane) for lane in incoming_lanes)
+        avg_waiting_time = np.mean([traci.lane.getWaitingTime(lane) for lane in incoming_lanes])
+
+        fuzzy_system.input['num_vehicles'] = total_vehicles
+        fuzzy_system.input['waiting_time'] = avg_waiting_time
+        fuzzy_system.compute()
+
+        try:
+            green_time = fuzzy_system.output['green_duration']
+
+            # A zöld időt minden sávra alkalmazzuk és csak akkor írjuk ki, ha legalább 3 másodperc a változás
+            for lane in incoming_lanes:
+                if lane_green_times[lane] is None or abs(lane_green_times[lane] - green_time) >= change_threshold:
+                    print(f"🚦 Sáv: {lane} - Zöld idő változott: {green_time:.1f} mp (Autók: {total_vehicles}, Várakozás: {avg_waiting_time:.1f}s)")
+                    traci.trafficlight.setPhaseDuration(junction_id, green_time)
+                    lane_green_times[lane] = green_time  # Frissítjük a sáv zöld idejét
+
+        except KeyError:
+            print("Hiba a kimenet lekérésében, ellenőrizd a fuzzy rendszert!")
+            continue  # Visszaugrás a következő ciklusra
+
+    traci.close()
+
+if __name__ == "__main__":
+    run_simulation()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+...........................................................................................
+
+
+
+
+
+
+
+import traci
+import time
+
+sumoCmd = ["sumo-gui", "-c", "osm.sumocfg"]
+traci.start(sumoCmd)
+
+auto_szam = 0
+cel_auto_szam = 100
+
+while auto_szam < cel_auto_szam:
+    traci.simulationStep()
+    auto_szam = traci.vehicle.getIDCount()
+    print(f"Jelenlegi autók száma: {auto_szam}")
+    time.sleep(0.1)  # Opcionális: lassítja a szimulációt a jobb láthatóság érdekében
+
+print(f"Elértük a {cel_auto_szam} autót. Szimuláció leállítása.")
+traci.close()
+   
+
+Autoook szamaaaa
+
+
+
+
+
+
+
+
+import traci
+import numpy as np
+import sumolib
+
+# SUMO indítása
+sumoCmd = ["sumo-gui", "-c", "osm.sumocfg"]
+traci.start(sumoCmd)
+
+step = 0
+
+# Fortuna kereszteződés adatai
+traffic_light_Fortuna = "cluster_249821091_249821092_249821094_26003449_#13more"
+detector1_0_f = "laneAreaDetector188302703#1_0"
+detector1_1_f = "laneAreaDetector188302703#1_1"
+detector1_2_f = "laneAreaDetector188302703#1_2"
+detector2_0_f = "laneAreaDetector-869087990_0"
+detector2_1_f = "laneAreaDetector-869087990_1"
+detector3_0_f = "laneAreaDetector695614758_0"
+detector3_1_f = "laneAreaDetector695614758_1"
+detector3_2_f = "laneAreaDetector695614758_2"
+detector4_0_f = "laneAreaDetector862984187_0"
+detector4_1_f = "laneAreaDetector862984187_1"
+detector4_2_f = "laneAreaDetector862984187_2"
+detector4_3_f = "laneAreaDetector862984187_3"
+
+# Tagsági függvények definíciója (háromszög függvények)
+def triangle_membership(x, a, b, c):
+    if a <= x <= b:
+        return (x - a) / (b - a)
+    elif b <= x <= c:
+        return (c - x) / (c - b)
+    else:
+        return 0
+
+def low_traffic(x):
+    return triangle_membership(x, 0, 30, 60)
+
+def medium_traffic(x):
+    return triangle_membership(x, 30, 60, 90)
+
+def high_traffic(x):
+    return triangle_membership(x, 60, 90, 120)
+
+def short_green(x):
+    return triangle_membership(x, 10, 20, 30)
+
+def medium_green(x):
+    return triangle_membership(x, 20, 30, 40)
+
+def long_green(x):
+    return triangle_membership(x, 30, 40, 50)
+
+# Lineáris egyenletek definíciója
+def linear_equations(traffic_density):
+    green_duration1 = 50 - 0.5 * traffic_density  # Alacsony forgalom
+    green_duration2 = 30 + 0.1 * traffic_density  # Közepes forgalom
+    green_duration3 = 10 + 0.2 * traffic_density  # Magas forgalom
+    return green_duration1, green_duration2, green_duration3
+
+# Fuzzy következtetés
+def fuzzy_inference(traffic_density):
+    low = low_traffic(traffic_density)
+    medium = medium_traffic(traffic_density)
+    high = high_traffic(traffic_density)
+
+    green1, green2, green3 = linear_equations(traffic_density)
+
+    numerator = low * green1 + medium * green2 + high * green3
+    denominator = low + medium + high
+
+    if denominator == 0:
+        return 30  # Alapértelmezett érték
+    else:
+        return numerator / denominator
+
+while traci.simulation.getMinExpectedNumber() > 0:
+    traci.simulationStep()
+
+    # Forgalom sűrűség mérése a detektorok alapján
+    traffic_density_fortuna = (
+        traci.lanearea.getLastStepVehicleNumber(detector1_0_f) +
+        traci.lanearea.getLastStepVehicleNumber(detector1_1_f) +
+        traci.lanearea.getLastStepVehicleNumber(detector1_2_f) +
+        traci.lanearea.getLastStepVehicleNumber(detector2_0_f) +
+        traci.lanearea.getLastStepVehicleNumber(detector2_1_f) +
+        traci.lanearea.getLastStepVehicleNumber(detector3_0_f) +
+        traci.lanearea.getLastStepVehicleNumber(detector3_1_f) +
+        traci.lanearea.getLastStepVehicleNumber(detector3_2_f) +
+        traci.lanearea.getLastStepVehicleNumber(detector4_0_f) +
+        traci.lanearea.getLastStepVehicleNumber(detector4_1_f) +
+        traci.lanearea.getLastStepVehicleNumber(detector4_2_f) +
+        traci.lanearea.getLastStepVehicleNumber(detector4_3_f)
+    )
+
+    # Fuzzy következtetés alkalmazása
+    green_duration = fuzzy_inference(traffic_density_fortuna)
+
+    # Jelzőlámpa vezérlése
+    traci.trafficlight.setPhaseDuration(traffic_light_Fortuna, green_duration)
+
+    step += 1
+
+traci.close()
+
+
+
+#import numpy as np
+#import traci
+#import sumolib
+#
+#def triangle_membership(x, a, b, c):
+#    """Háromszög tagsági függvény."""
+#    if a <= x <= b:
+#        return (x - a) / (b - a)
+#    elif b <= x <= c:
+#        return (c - x) / (c - b)
+#    else:
+#        return 0
+#
+## Forgalom sűrűsége tagsági függvények
+#def low_traffic(x):
+#    return triangle_membership(x, 0, 30, 60)
+#
+#def medium_traffic(x):
+#    return triangle_membership(x, 30, 60, 90)
+#
+#def high_traffic(x):
+#    return triangle_membership(x, 60, 90, 120)
+#
+## Zöld lámpa időtartama tagsági függvények
+#def short_green(x):
+#    return triangle_membership(x, 10, 20, 30)
+#
+#def medium_green(x):
+#    return triangle_membership(x, 20, 30, 40)
+#
+#def long_green(x):
+#    return triangle_membership(x, 30, 40, 50)
+#    
+#def linear_equations(traffic_density):
+#    """Lineáris egyenletek a kimenethez."""
+#    green_duration1 = 50 - 0.5 * traffic_density  # Alacsony forgalom
+#    green_duration2 = 30 + 0.1 * traffic_density  # Közepes forgalom
+#    green_duration3 = 10 + 0.2 * traffic_density  # Magas forgalom
+#    return green_duration1, green_duration2, green_duration3
+#
+#def fuzzy_inference(traffic_density):
+#    """Fuzzy következtetés."""
+#    rule1, rule2, rule3 = fuzzy_rules(traffic_density)
+#    green1, green2, green3 = linear_equations(traffic_density)
+#
+#    # Súlyozott átlag számítása
+#    numerator = rule1 * green1 + rule2 * green2 + rule3 * green3
+#    denominator = rule1 + rule2 + rule3
+#
+#    if denominator == 0:
+#        return 30 # Alapertelmezett érték, ha egyik szabály sem aktív
+#    else:
+#        return numerator / denominator
+#        
+#def run_simulation():
+#    sumoBinary = sumolib.checkBinary('sumo')
+#    sumoCmd = [sumoBinary, "-c", "osm.sumocfg"]
+#    traci.start(sumoCmd)
+#    edge1=
+#    trafficlight1= "cluster_249821091_249821092_249821094_26003449_#13more"
+#    
+#
+#    for i in range(100):  # 100 szimulációs lépés
+#        # Példa forgalom sűrűség mérése (helyettesítsd a saját méréseddel)
+#        traffic_density = traci.edge.getLastStepVehicleNumber("edge1") #példa edge
+#
+#        green_duration = fuzzy_inference(traffic_density)
+#        print(f"Traffic Density: {traffic_density}, Green Duration: {green_duration}")
+#
+#        # Példa jelzőlámpa időzítés beállítása (helyettesítsd a saját logikáddal)
+#        traci.trafficlight.setPhaseDuration("trafficlight1", green_duration)
+#
+#        traci.simulationStep()
+#
+#    traci.close()
+#
+#if __name__ == "__main__":
+#    run_simulation()
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+##import traci
+##
+##traci.start(["sumo-gui", "-c", "osm.sumocfg"])
+##
+##
+##step = 0
+##while traci.simulation.getMinNextStepLength() >= 0:
+##    traci.simulationStep()
+##    # Forgalomirányítási logika itt
+##    step += 1
+##
+##
+##traci.close()
+##
+##
+#
+#
+#
+#
+##import traci
+##import sumolib
+##
+##sumoBinary = sumolib.checkBinary('sumo')
+##sumoCmd = [sumoBinary, "-c", "osm.sumocfg"]
+##traci.start(sumoCmd)
+##
+##for i in range(10):
+##    traci.simulationStep()
+##
+##traci.close()
+##
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+##import traci
+##import numpy as np
+##import skfuzzy as fuzz
+##from skfuzzy import control as ctrl
+##
+##sumoCmd = ["sumo-gui", "-c", "osm.sumocfg"]
+##traci.start(sumoCmd)
+##
+##step = 0
+##
+##traffic_light_fortuna = "cluster_249821091_249821092_249821094_26003449_#13more"
+##detector_fortuna_1 = "laneAreaDetector188302703#1_0"
+##detector_fortuna_2 = "laneAreaDetector-869087990_0"
+##
+##forgalom_fortuna_1 = ctrl.Antecedent(np.arange(0, 100, 1), 'forgalom_1')
+##forgalom_fortuna_2 = ctrl.Antecedent(np.arange(0, 100, 1), 'forgalom_2')
+##
+##forgalom_fortuna_1['kicsi'] = fuzz.trimf(forgalom_fortuna_1.universe, [0, 20, 40])
+##forgalom_fortuna_1['kozepes'] = fuzz.trimf(forgalom_fortuna_1.universe, [20, 50, 80])
+##forgalom_fortuna_1['nagy'] = fuzz.trimf(forgalom_fortuna_1.universe, [50, 80, 100])
+##
+##forgalom_fortuna_2['kicsi'] = fuzz.trimf(forgalom_fortuna_2.universe, [0, 20, 40])
+##forgalom_fortuna_2['kozepes'] = fuzz.trimf(forgalom_fortuna_2.universe, [20, 50, 80])
+##forgalom_fortuna_2['nagy'] = fuzz.trimf(forgalom_fortuna_2.universe, [50, 80, 100])
+##
+##def ts_rule1(forgalom1, forgalom2):
+##    return 0.8 * forgalom1 + 0.2 * forgalom2 + 10
+##
+##def ts_rule2(forgalom1, forgalom2):
+##    return 0.5 * forgalom1 + 0.5 * forgalom2 + 30
+##
+##def ts_rule3(forgalom1, forgalom2):
+##    return 0.2 * forgalom1 + 0.8 * forgalom2 + 50
+##
+##while traci.simulation.getMinExpectedNumber() > 0:
+##    traci.simulationStep()
+##
+##    forgalom1_ertek = traci.lanearea.getLastStepVehicleNumber(detector_fortuna_1)
+##    forgalom2_ertek = traci.lanearea.getLastStepVehicleNumber(detector_fortuna_2)
+##
+##    # Szabályok alkalmazása
+##    if fuzz.interp_membership(forgalom_fortuna_1.universe, forgalom_fortuna_1['nagy'], forgalom1_ertek) > 0 and fuzz.interp_membership(forgalom_fortuna_2.universe, forgalom_fortuna_2['kicsi'], forgalom2_ertek) > 0:
+##        zold_ido = ts_rule1(forgalom1_ertek, forgalom2_ertek)
+##    elif fuzz.interp_membership(forgalom_fortuna_1.universe, forgalom_fortuna_1['kozepes'], forgalom1_ertek) > 0 and fuzz.interp_membership(forgalom_fortuna_2.universe, forgalom_fortuna_2['kozepes'], forgalom2_ertek) > 0:
+##        zold_ido = ts_rule2(forgalom1_ertek, forgalom2_ertek)
+##    elif fuzz.interp_membership(forgalom_fortuna_1.universe, forgalom_fortuna_1['kicsi'], forgalom1_ertek) > 0 and fuzz.interp_membership(forgalom_fortuna_2.universe, forgalom_fortuna_2['nagy'], forgalom2_ertek) > 0:
+##        zold_ido = ts_rule3(forgalom1_ertek, forgalom2_ertek)
+##    else:
+##        zold_ido = 40  # Alapértelmezett érték
+##
+##    zold_ido_int = int(zold_ido)
+##    piros_ido = 80 - zold_ido_int
+##    traci.trafficlight.setRedYellowGreenState(traffic_light_fortuna, "g" * zold_ido_int + "r" * piros_ido + "g" * zold_ido_int + "r" * piros_ido)
+##
+##    step += 1
+##
+##traci.close()
+
+
+
+
+
