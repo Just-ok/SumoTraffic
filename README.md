@@ -1,4 +1,4 @@
-umoTraffic
+SumoTraffic
 
 Traffic Automation via ANFIS in SUMO Simulation
 
