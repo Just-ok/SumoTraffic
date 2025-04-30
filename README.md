@@ -39,7 +39,7 @@ A szimuláció elindítja a **SUMO GUI-t**, és automatikusan kezeli a jelzőlá
 - Jelzőlámpák valós idejű dinamikus vezérlése
 - Grafikus elemzés: zöldidő változása és torlódási szintek vizualizálása
 
-## 👨‍💻 Készítette
+## 👩‍💻 Készítette
 - Osváth Katalin
 - Projekt keretében: **Traffic Automation via Fuzzy Logic (2025)**
 - Access Documentation: https://docs.google.com/document/d/1lIEeY24DT67xbaSy4n_E8bk36o8pfLyyaalM22omWRo/edit?usp=sharing
